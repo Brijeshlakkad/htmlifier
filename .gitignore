@@ -1,2 +1,5 @@
 # HTMLifier testing files
 testing
+credentials.json
+node_modules
+package-lock.json
