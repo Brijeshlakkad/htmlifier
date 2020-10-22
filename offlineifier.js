@@ -1,7 +1,7 @@
-function offlineify ({
+function offlineify({
   log = console.log
 } = {}) {
-  function toDataURI (response) {
+  function toDataURI(response) {
     return response.blob().then(blob => new Promise(resolve => {
       const reader = new FileReader()
       reader.addEventListener('load', e => {
@@ -10,7 +10,7 @@ function offlineify ({
       reader.readAsDataURL(blob)
     }))
   }
-  function toText (file) {
+  function toText(file) {
     return response => {
       if (response.ok) {
         return response.text()
@@ -20,20 +20,20 @@ function offlineify ({
       }
     }
   }
-  function problemFetching (file) {
+  function problemFetching(file) {
     return err => {
       console.error(err);
       log(`There was a problem fetching ${file} from the internet`, 'error')
       throw new Error('error logged')
     }
   }
-  function removeScriptTag (js) {
+  function removeScriptTag(js) {
     return js.replace(/<\/script>/g, '')
   }
   log('Getting all required files...', 'status')
   return Promise.all([
     fetch('./index.html').catch(problemFetching('this web page')).then(toText('this web page')),
-    fetch('https://sheeptester.github.io/scratch-vm/16-9/vm.min.js')
+    fetch('./vm.min.js')
       .catch(problemFetching('the Scratch engine'))
       .then(toText('the Scratch engine'))
       .then(async vmCode => {

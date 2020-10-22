@@ -1,5 +1,6 @@
 const extensionWorkerGet = /new\s+Worker\([^")]*"[^"]*(extension-worker(?:\.min)?\.js)"\)/
 
+const assetHost = 'static/scratch';
 /**
  * @param {Asset} asset - calculate a URL for this asset.
  * @returns {string} a URL to download a project file.
@@ -16,54 +17,55 @@ const getProjectUrl = ({ assetId }) => {
  * @returns {string} a URL to download a project asset (PNG, WAV, etc.)
  */
 const getAssetUrl = ({ assetId, dataFormat }) => {
-  return `https://cdn.assets.scratch.mit.edu/internalapi/asset/${assetId}.${dataFormat}/get/`;
+  return `${this.assetHost}/${assetId}.${dataFormat}`;
 };
 
 class LoadingProgress {
-    constructor (callback) {
-        this.total = 0;
-        this.complete = 0;
-        this.callback = callback;
-    }
+  constructor(callback) {
+    this.total = 0;
+    this.complete = 0;
+    this.callback = callback;
+  }
 
-    on (storage) {
-        const _this = this;
-        const _load = storage.webHelper.load;
-        storage.webHelper.load = function (...args) {
-            const result = _load.call(this, ...args);
-            _this.total += 1;
-            _this.callback(_this);
-            result.then(asset => {
-                _this.complete += 1;
-                _this.callback(_this, asset);
-            });
-            return result;
-        };
-    }
+  on(storage) {
+    const _this = this;
+    const _load = storage.webHelper.load;
+    storage.webHelper.load = function (...args) {
+      const result = _load.call(this, ...args);
+      _this.total += 1;
+      _this.callback(_this);
+      result.then(asset => {
+        _this.complete += 1;
+        _this.callback(_this, asset);
+      });
+      return result;
+    };
+  }
 }
 
 // Basically vm.downloadProjectId except it actually returns the promise
-function downloadProjectId (vm, storage, id) {
+function downloadProjectId(vm, storage, id) {
   return storage.load(storage.AssetType.Project, id)
     .then(projectAsset => vm.loadProject(projectAsset.data));
 }
 
 // Based on https://github.com/LLK/scratch-vm/blob/develop/src/serialization/serialize-assets.js
 const serializeAssets = function (runtime, assetType) {
-    const targets = runtime.targets;
-    const assetDescs = [];
-    for (let i = 0; i < targets.length; i++) {
-        const currTarget = targets[i];
-        const currAssets = currTarget.sprite[assetType];
-        for (let j = 0; j < currAssets.length; j++) {
-            const currAsset = currAssets[j];
-            const asset = currAsset.asset;
-            assetDescs.push({
-                fileName: `${asset.assetId}.${asset.dataFormat}`,
-                fileContent: asset.data});
-        }
+  const targets = runtime.targets;
+  const assetDescs = [];
+  for (let i = 0; i < targets.length; i++) {
+    const currTarget = targets[i];
+    const currAssets = currTarget.sprite[assetType];
+    for (let j = 0; j < currAssets.length; j++) {
+      const currAsset = currAssets[j];
+      const asset = currAsset.asset;
+      assetDescs.push({
+        fileName: `${asset.assetId}.${asset.dataFormat}`,
+        fileContent: asset.data
+      });
     }
-    return assetDescs;
+  }
+  return assetDescs;
 };
 const getAssets = runtime => [
   ...serializeAssets(runtime, 'sounds'),
@@ -139,7 +141,7 @@ function downloadAsHTML(projectSrc, {
   // Otherwise, the modded NotVirtualMachine will not get width and height
   // and that messes up mouse things (see #7)
   customRatio = true
-  function problemFetching (file) {
+  function problemFetching(file) {
     return err => {
       console.error(err)
       log(`There was a problem fetching ${file} from the internet`, 'error')
@@ -147,7 +149,7 @@ function downloadAsHTML(projectSrc, {
     }
   }
   log('Getting project...', 'status');
-  loadingProgress.callback = ({complete, total}, file) => {
+  loadingProgress.callback = ({ complete, total }, file) => {
     log(complete + '/' + total + (file ? ` (+ ${file.data.length / 1000} kB ${file.dataFormat})` : ''), 'progress')
   };
   let zip
@@ -163,15 +165,13 @@ function downloadAsHTML(projectSrc, {
             return 'var TYPE = "zip",\n';
           } else {
             log('Getting data URIs...', 'status');
-            const preface = `var TYPE = 'json',\nPROJECT_JSON = ${
-              JSON.stringify(await getDataURL(new Blob([projectAsset])))
-            },\nASSETS = ${
-              JSON.stringify(Object.fromEntries(await Promise.all(getAssets(vm.runtime)
+            const preface = `var TYPE = 'json',\nPROJECT_JSON = ${JSON.stringify(await getDataURL(new Blob([projectAsset])))
+              },\nASSETS = ${JSON.stringify(Object.fromEntries(await Promise.all(getAssets(vm.runtime)
                 .map(async ({ fileName, fileContent }) => [
                   fileName,
                   await getDataURL(new Blob([fileContent]))
                 ]))), null, 2)
-            },\n`;
+              },\n`;
             return preface;
           }
         })
@@ -197,8 +197,10 @@ function downloadAsHTML(projectSrc, {
         // [offline-vm-src]
         .then(async vmCode => {
           if (extension) {
+
             const extensionWorkerMatch = vmCode.match(extensionWorkerGet)
             if (extensionWorkerMatch) {
+              console.log("extensionWorkerGet, extensionWorkerMatch", extensionWorkerGet, extensionWorkerMatch)
               log('Getting extension worker', status)
               /* no-offline */
               const workerCode = await fetch('https://sheeptester.github.io/scratch-vm/16-9/' + extensionWorkerMatch[1])
@@ -218,15 +220,13 @@ function downloadAsHTML(projectSrc, {
                   }
                 })
               // https://stackoverflow.com/a/10372280
-              const workerMaker = `new Worker(URL.createObjectURL(new Blob([${
-                JSON.stringify(workerCode.replace(/importScripts\(\w+\)/, () => {
-                  // So apparently object URLs created in the main thread can't be
-                  // accessed by a web worker oof
-                  return `importScripts(URL.createObjectURL(new Blob([${
-                    JSON.stringify(extensionScript)
+              const workerMaker = `new Worker(URL.createObjectURL(new Blob([${JSON.stringify(workerCode.replace(/importScripts\(\w+\)/, () => {
+                // So apparently object URLs created in the main thread can't be
+                // accessed by a web worker oof
+                return `importScripts(URL.createObjectURL(new Blob([${JSON.stringify(extensionScript)
                   }], {type: 'application/javascript'})))`
-                }))
-              }], {type: 'application/javascript'})))`
+              }))
+                }], {type: 'application/javascript'})))`
               vmCode = vmCode.slice(0, extensionWorkerMatch.index) + workerMaker +
                 vmCode.slice(extensionWorkerMatch.index + extensionWorkerMatch[0].length)
             }
@@ -240,7 +240,16 @@ function downloadAsHTML(projectSrc, {
     fetch(
       /* no-offline */ './template.html' /* /no-offline */
       // [template]
-    ).catch(problemFetching('the HTML template')).then(r => r.text()),
+      , {
+        method: 'GET',
+        mode: 'cors', // no-cors, *cors, same-origin
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': '*'
+          // 'Content-Type': 'application/x-www-form-urlencoded',
+        }
+      }).catch(problemFetching('the HTML template')).then(r => r.text()),
 
     // fetch image data for loading gif
     loadingImage
