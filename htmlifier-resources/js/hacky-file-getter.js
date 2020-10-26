@@ -1,6 +1,6 @@
 const extensionWorkerGet = /new\s+Worker\([^")]*"[^"]*(extension-worker(?:\.min)?\.js)"\)/
 
-const assetHost = 'static/scratch';
+const assetHost = '../static/scratch';
 /**
  * @param {Asset} asset - calculate a URL for this asset.
  * @returns {string} a URL to download a project file.
@@ -247,6 +247,14 @@ function downloadAsHTML(projectSrc, {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Headers': '*'
+        // method: 'GET',
+        // mode: 'no-cors',
+        // headers: {
+        //   'Content-Type': 'application/json',
+        //   'Access-Control-Allow-Origin': '*',
+        //   'Access-Control-Allow-Headers': '*',
+        //   'Content-type': 'text/html',
+        //   'Accept': 'text/html',
           // 'Content-Type': 'application/x-www-form-urlencoded',
         }
       }).catch(problemFetching('the HTML template')).then(r => r.text()),

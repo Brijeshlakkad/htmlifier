@@ -59,30 +59,30 @@ const store = admin.firestore();
 const convertSb3ToHtml = (directoryName, filename) => {
     return new Promise(async (resolve, reject) => {
         try {
-            let launchOptions = {headless: true, args: ['--start-maximized']};
+            let launchOptions = {headless: false, args: ['--start-maximized']};
             const browser = await ptr.launch(launchOptions);
             const page = await browser.newPage();
             await page.setViewport({width: 1366, height: 768});
             // await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36');
-            await page._client.send('Page.setDownloadBehavior', {behavior: 'allow', downloadPath: `/home/apk/APK/${directoryName}/`})
-            const p = path.join(__dirname, '/htmlifier-resources/htmlifier-offline.html');
+            await page._client.send('Page.setDownloadBehavior', {behavior: 'allow', downloadPath: `/home/ashish/APK/${directoryName}/`})
+            const p = path.join(__dirname, '/htmlifier-resources/index.html');
             await page.goto(`file://${p}`);
             await page.waitForSelector('input[type=file]');
             await page.waitFor(1000);
             const inputUploadHandle = await page.$('input[type=file]');
-            let fileToUpload = `/home/apk/APK/${directoryName}/${filename}.sb3`;
+            let fileToUpload = `/home/ashish/APK/${directoryName}/${filename}.sb3`;
             inputUploadHandle.uploadFile(fileToUpload);
             await page.waitFor(500);
             await page.$eval('#title', el => el.value = 'index');
             await (await page.waitForSelector('#load-no-minify')).click();
-            setTimeout(async () => {
-                browser.close().then(() => {
-                    resolve(true);
-                }).catch((err) => {
-                    console.log(err);
-                    reject(false);
-                });
-            }, 2000);
+            // setTimeout(async () => {
+            //     browser.close().then(() => {
+            //         resolve(true);
+            //     }).catch((err) => {
+            //         console.log(err);
+            //         reject(false);
+            //     });
+            // }, 2000);
         } catch (err) {
             console.log(err);
             reject(false);
@@ -114,11 +114,11 @@ const convertSb3ToApk = (directoryName, filename) => {
         console.log(status);
         if (status) {
             try {
-                await commandLineInstruction(`cordova create ${filename}  com.example.${filename} ${filename}`, `/home/apk/APK/${directoryName}/`);
-                await commandLineInstruction(`mv /home/apk/APK/${directoryName}/index.html /home/apk/APK/${directoryName}/${filename}/www/`, '.');
-                await commandLineInstruction('cordova platform add android', `/home/apk/APK/${directoryName}/${filename}`);
-                await commandLineInstruction('cordova build', `/home/apk/APK/${directoryName}/${filename}`).then(() => {
-                    resolve(`/home/apk/APK/${directoryName}/${filename}/platforms/android/app/build/outputs/apk/debug/app-debug.apk`); //apk path
+                await commandLineInstruction(`cordova create ${filename}  com.example.${filename} ${filename}`, `/home/ashish/APK/${directoryName}/`);
+                await commandLineInstruction(`mv /home/ashish/APK/${directoryName}/index.html /home/ashish/APK/${directoryName}/${filename}/www/`, '.');
+                await commandLineInstruction('cordova platform add android', `/home/ashish/APK/${directoryName}/${filename}`);
+                await commandLineInstruction('cordova build', `/home/ashish/APK/${directoryName}/${filename}`).then(() => {
+                    resolve(`/home/ashish/APK/${directoryName}/${filename}/platforms/android/app/build/outputs/ashish/debug/app-debug.apk`); //apk path
                 });
             } catch (err) {
                 reject(err);
@@ -134,7 +134,7 @@ const cleanup = (directoryName) => {
         try {
             // await commandLineInstruction(`rm ./temp/${filename}.sb3`, '.');
             // await commandLineInstruction(`rm -rf ./temp/${filename}`, '.');
-            await commandLineInstruction(`rm -rf /home/apk/APK/${directoryName}`, '.')
+            await commandLineInstruction(`rm -rf /home/ashish/APK/${directoryName}`, '.')
             resolve(true);
         } catch {
             reject(false);
@@ -180,69 +180,69 @@ app.post("/api/v1/getApk", async (req, res) => {
 
     filename = filename.split('.')[0].replace(/[\])}[{(] /g, '');
     filename = filename.replace(/\s/g, '_');
-    file.mv(`/home/apk/APK/${directoryName}/` + filename + '.sb3');
+    file.mv(`/home/ashish/APK/${directoryName}/` + filename + '.sb3');
 
     convertSb3ToApk(directoryName, filename).then((path) => {
         
-        console.log(path);
+    //     console.log(path);
 
-        const metadata = {
-            metadata: {
-                // This line is very important. It's to create a download token.
-                firebaseStorageDownloadtokens: uuid()
-            },
-            contentType: 'application/vnd.android.package-archive',
-        };
+    //     const metadata = {
+    //         metadata: {
+    //             // This line is very important. It's to create a download token.
+    //             firebaseStorageDownloadtokens: uuid()
+    //         },
+    //         contentType: 'application/vnd.android.package-archive',
+    //     };
 
-        bucket.upload(path, {
-            destination: `user_assets/${uid}/apks/${requestId}/project.apk`,
-            // Support for HTTP requests made with `Accept-Encoding: gzip`
-            gzip: true,
-            metadata: metadata
-        }).then(async (data) => {
-            const userApkDoc = await (await store.collection(`user_apk_requests`).doc(uid).get()).data();
-            const prevBytesSize = userApkDoc['total_byte_size'];
-            const curBytes = parseInt(data[1]["size"]);
-            const totalBytes = prevBytesSize + curBytes;
-            const reqDocRef = store.collection(`user_apk_requests/${uid}/requests/`).doc(requestId);
-            reqDocRef.update({
-                status: "SUCCESS",
-            });
-            const userRef = store.collection(`user_apk_requests`).doc(uid);
-            userRef.update({
-                current_status: "IDLE",
-                 total_byte_size: totalBytes
-            });
-            res.send({
-                status: 200,
-                'message': 'apk created successfully'
-            });
-            cleanup(directoryName).then((val) => {
-                console.log(val);
-                // res.send('apk successfully created!');
-            }).catch((err) => {
-                console.log(err);
-            })
-        }).catch((err) => {
-            console.log('err: ', err);
-            const reqDocRef = store.collection(`user_apk_requests/${uid}/requests/`).doc(requestId);
-            reqDocRef.update({
-                status: "ERROR",
-            });
-            const userRef = store.collection(`user_apk_requests`).doc(uid);
-            userRef.update({
-                current_status: "IDLE",
-            });
-            res.send({
-                status: 400,
-                'message': err
-            });
-            cleanup(directoryName).then((val) => {
-                console.log(val);
-            }).catch((err) => {
-                console.log(err);
-            })
-        })
+    //     bucket.upload(path, {
+    //         destination: `user_assets/${uid}/apks/${requestId}/project.apk`,
+    //         // Support for HTTP requests made with `Accept-Encoding: gzip`
+    //         gzip: true,
+    //         metadata: metadata
+    //     }).then(async (data) => {
+    //         const userApkDoc = await (await store.collection(`user_apk_requests`).doc(uid).get()).data();
+    //         const prevBytesSize = userApkDoc['total_byte_size'];
+    //         const curBytes = parseInt(data[1]["size"]);
+    //         const totalBytes = prevBytesSize + curBytes;
+    //         const reqDocRef = store.collection(`user_apk_requests/${uid}/requests/`).doc(requestId);
+    //         reqDocRef.update({
+    //             status: "SUCCESS",
+    //         });
+    //         const userRef = store.collection(`user_apk_requests`).doc(uid);
+    //         userRef.update({
+    //             current_status: "IDLE",
+    //              total_byte_size: totalBytes
+    //         });
+    //         res.send({
+    //             status: 200,
+    //             'message': 'apk created successfully'
+    //         });
+    //         cleanup(directoryName).then((val) => {
+    //             console.log(val);
+    //             // res.send('apk successfully created!');
+    //         }).catch((err) => {
+    //             console.log(err);
+    //         })
+    //     }).catch((err) => {
+    //         console.log('err: ', err);
+    //         const reqDocRef = store.collection(`user_apk_requests/${uid}/requests/`).doc(requestId);
+    //         reqDocRef.update({
+    //             status: "ERROR",
+    //         });
+    //         const userRef = store.collection(`user_apk_requests`).doc(uid);
+    //         userRef.update({
+    //             current_status: "IDLE",
+    //         });
+    //         res.send({
+    //             status: 400,
+    //             'message': err
+    //         });
+    //         cleanup(directoryName).then((val) => {
+    //             console.log(val);
+    //         }).catch((err) => {
+    //             console.log(err);
+    //         })
+    //     })
 
     }).catch((err) => {
         console.log(err);

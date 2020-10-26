@@ -3,3 +3,4 @@ testing
 credentials.json
 node_modules
 package-lock.json
+.env
